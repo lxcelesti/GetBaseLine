@@ -13,7 +13,7 @@ email=celesti@lx.or.kr
 about=It conbines parcels that have the same main address number of PNU. It dissolves the same main address number. 
 
 tracker=http://bugs
-repository=https://github.com/lxcelesti/GetBaseLine
+repository=https://github.com/lxsurvey/GetBaseLine
 # End of mandatory metadata
 
 # Recommended items:
