@@ -1,4 +1,4 @@
-# This file contains metadata for your plugin.
+6# This file contains metadata for your plugin.
 
 # This file should be included when you package your plugin.# Mandatory items:
 
@@ -6,7 +6,7 @@
 name=GetBaseLine
 qgisMinimumVersion=3.0
 description=GetBaseLine
-version=0.5
+version=0.6
 author=LX
 email=celesti@lx.or.kr
 
