@@ -23,7 +23,7 @@ hasProcessingProvider=no
 # changelog=
 
 # Tags are comma separated with spaces allowed
-tags=PNU dessolve union sajeongline LX Continuous Cadastral Map
+tags=PNU, dessolve, union, sajeongline, LX, Continuous Cadastral Map
 
 homepage=https://github.com/lxsurvey/GetBaseLine
 category=Plugins
