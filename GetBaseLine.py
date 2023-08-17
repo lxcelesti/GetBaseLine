@@ -254,7 +254,7 @@ class GetBaseLine:
                                                             duration=3)
                         new_name = f_name + "(" + str(file_num) + ")"
                         break
-                    else:
+                    else: 
                         dup_chk_num += 1
                 if len(layers) == dup_chk_num:
                     dup_chk_fin = True
