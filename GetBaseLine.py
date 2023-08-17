@@ -200,14 +200,11 @@ class GetBaseLine:
             else:
                 pass
 
-
         self.dlg.comboBox.addItems([input_filename])
 
         self.dlg.comboBox.setCurrentIndex(self.dlg.comboBox.count() - 1)
 
     def run(self):
-        """Run method that performs all the real work"""
-
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
@@ -239,31 +236,58 @@ class GetBaseLine:
             else:
                 print("Layer loaded!")
 
+            f_name = os.path.splitext(os.path.basename(input_filename))[0] + "_temp"
+            file_num = 0
+            dup_chk_fin = False
+            dup_chk_num = 0
+            new_name = f_name
+
+            self.iface.messageBar().pushMessage("name", "# of layer:" + str(len(layers)), level=Qgis.Info, duration=3)
+
+            while dup_chk_fin == False:
+                file_num += 1
+                dup_chk_num = 0
+
+                for layer in layers:
+                    if new_name == layer.name():
+                        self.iface.messageBar().pushMessage("name", "The same layer exists. Renaming " +new_name, level=Qgis.Info,
+                                                            duration=3)
+                        new_name = f_name + "(" + str(file_num) + ")"
+                        break
+                    else:
+                        dup_chk_num += 1
+                if len(layers) == dup_chk_num:
+                    dup_chk_fin = True
+                    f_name = new_name
+            self.iface.messageBar().pushMessage("name", "# of check: " + str(dup_chk_num), level=Qgis.Info, duration=3)
+
+
+            temp_filename = ''.join(os.path.dirname(input_filename)) +"/"+ f_name + ".shp"
+            self.iface.messageBar().pushMessage("name", temp_filename, level=Qgis.Info, duration=3)
             save_options = QgsVectorFileWriter.SaveVectorOptions()
             save_options.driverName = "ESRI Shapefile"
             save_options.fileEncoding = "UTF-8"
             transform_context = QgsProject.instance().transformContext()
 
-            error = QgsVectorFileWriter.writeAsVectorFormatV3(flayer,
-                                                              "C:\Workspace\poly_temp.shp",
-                                                              transform_context,
-                                                              save_options)
+            error = QgsVectorFileWriter.writeAsVectorFormatV3(flayer, temp_filename, transform_context, save_options)
 
             if error[0] == QgsVectorFileWriter.NoError:
                 print("temp layer created.")
             else:
                 print(error)
 
-            path_to_poly_layer = "C:\Workspace\poly_temp.shp"
-            flayer = QgsVectorLayer(path_to_poly_layer, "poly_temp", "ogr")
-            if not flayer.isValid():
+
+            path_to_poly_layer = temp_filename
+            vlayer = QgsVectorLayer(path_to_poly_layer, f_name, "ogr")
+            if not vlayer.isValid():
                 print("Duplicated Layer failed to load!")
             else:
-                vlayer = QgsProject.instance().addMapLayer(flayer)
+                QgsProject.instance().addMapLayer(vlayer)
                 print("Duplicated Layer loaded!")
 
             symbol = QgsFillSymbol.createSimple(
                 {"outline_style": "solid", "outline_color": "black", "color": "#00ff0000", "outline_width": "0.5"})
+
             vlayer.renderer().setSymbol(symbol)
             vlayer.triggerRepaint()
             self.iface.layerTreeView().refreshLayerSymbology(vlayer.id())
@@ -271,87 +295,78 @@ class GetBaseLine:
             bfield_cnt = 0
             pnufield_cnt = 0
             for f in vlayer.fields():
-                if f.name() == "bungi":
+                if f.name() == "BUNGI" or f.name() == "bungi":
                     bfield_cnt += 1
-                elif f.name() == "PNU":
+                elif f.name() == "PNU" or f.name() == "pnu":
                     pnufield_cnt += 1
 
-            if pnufield_cnt > 0:
-                print("PNU validation checked OK")
-            else:
+            if pnufield_cnt < 1:
                 print("PNU field is not existed")
-            if bfield_cnt > 0:
-                print("bungi validation checked OK")
+                self.iface.messageBar().pushMessage("No PNU", "This file(" + input_filename + ") doesn't have PNU.", level=Qgis.Info, duration=3)
             else:
-                pr = vlayer.dataProvider()
-                pr.addAttributes([QgsField("bungi", QVariant.String)])
+                print("PNU validation checked OK")
+
+                if bfield_cnt > 0:
+                    print("bungi validation checked OK")
+                else:
+                    pr = vlayer.dataProvider()
+                    pr.addAttributes([QgsField("bungi", QVariant.String)])
+                    vlayer.updateFields()
+                    print("bungi field is created")
+
+                expression1 = QgsExpression('left("PNU", 15)')
+                expression2 = QgsExpression('length("PNU" )')
+                context = QgsExpressionContext()
+                context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(vlayer))
+
+                pnu_count = 0
+                pnu_valid = 0
+                pnu_len = 0
+
+                vlayer.beginEditCommand("Feature triangulation")
+                vlayer.startEditing()
+
+                for field in vlayer.getFeatures():
+                    pnu_count += 1
+
+                    context.setFeature(field)
+                    field["bungi"] = expression1.evaluate(context)
+                    pnu_len = expression2.evaluate(context)
+                    if pnu_len == 19:
+                        pnu_valid += 1
+                        vlayer.updateFeature(field)
+
+                        print(field["bungi"], pnu_count)
+                    #vlayer.changeAttributeValue(field)
+
+                vlayer.commitChanges()
+                vlayer.endEditCommand()
+
                 vlayer.updateFields()
-                print("bungi field is created")
-
-            expression1 = QgsExpression('left("PNU", 15)')
-            expression2 = QgsExpression('length("PNU" )')
-            context = QgsExpressionContext()
-            context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(vlayer))
-
-
-            pnu_count = 0
-            pnu_valid = 0
-            pnu_len = 0
-
-            vlayer.beginEditCommand("Feature triangulation")
-
-            vlayer.startEditing()
-
-            for field in vlayer.getFeatures():
-                pnu_count += 1
-
-
-                context.setFeature(field)
-                field["bungi"] = expression1.evaluate(context)
-                pnu_len = expression2.evaluate(context)
-                if pnu_len == 19:
-                    pnu_valid += 1
-                    vlayer.updateFeature(field)
-
-                    print(field["bungi"], pnu_count)
-                #vlayer.changeAttributeValue(field)
-
-            vlayer.commitChanges()
-            vlayer.endEditCommand()
-
-            vlayer.updateFields()
-
-            print(pnu_valid, "of", pnu_count, "PNU are valid and processed ")
-
-            output_filename = self.dlg.lineEdit.text()
-
-            dissolve_result = processing.runAndLoadResults("native:dissolve", {'INPUT': vlayer,
+                print(pnu_valid, "of", pnu_count, "PNU are valid and processed ")
+                output_filename = self.dlg.lineEdit.text()
+                dissolve_result = processing.runAndLoadResults("native:dissolve", {'INPUT': vlayer,
                                                                       'FIELD': "bungi",
                                                                       'OUTPUT': 'TEMPORARY_OUTPUT'})
+                olayer = self.iface.activeLayer()
+                symbol = QgsFillSymbol.createSimple(
+                        {"outline_style": "solid", "outline_color": "Red", "color": "#00ff0000", "outline_width": "1"})
+                olayer.renderer().setSymbol(symbol)
+                olayer.triggerRepaint()
+                self.iface.layerTreeView().refreshLayerSymbology(olayer.id())
 
-            vlayer = self.iface.activeLayer()
+                error = QgsVectorFileWriter.writeAsVectorFormatV3(olayer,
+                                                                output_filename,
+                                                                transform_context,
+                                                                save_options)
 
-            symbol = QgsFillSymbol.createSimple(
-                {"outline_style": "solid", "outline_color": "Red", "color": "#00ff0000", "outline_width": "1"})
-            vlayer.renderer().setSymbol(symbol)
-            vlayer.triggerRepaint()
-            self.iface.layerTreeView().refreshLayerSymbology(vlayer.id())
+                if error[0] == QgsVectorFileWriter.NoError:
+                    print("saved", output_filename)
+                    self.iface.messageBar().pushMessage("Success", "Output file written at " + output_filename,
+                                                        level=Qgis.Success, duration=3)
+                else:
+                    print(error)
 
-
-            error = QgsVectorFileWriter.writeAsVectorFormatV3(vlayer,
-                                                              output_filename,
-                                                              transform_context,
-                                                              save_options)
-
-            if error[0] == QgsVectorFileWriter.NoError:
-                print("saved", output_filename)
-            else:
-                print(error)
-
-
-
-
-            self.iface.messageBar().pushMessage("Success", "Output file written at " + output_filename, level=Qgis.Success, duration=3)
 
 
 
