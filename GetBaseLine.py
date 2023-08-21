@@ -27,7 +27,7 @@ import os
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QFileDialog
-from qgis.core import QgsProject, QgsVectorLayer, Qgis, QgsVectorFileWriter, QgsField, QgsExpression, QgsExpressionContextUtils, QgsExpressionContext, QgsFillSymbol
+from qgis.core import QgsProject, QgsVectorLayer, Qgis, QgsVectorFileWriter, QgsField, QgsExpression, QgsExpressionContextUtils, QgsExpressionContext, QgsFillSymbol, QgsMapLayer
 from qgis.PyQt.QtCore import QVariant
 import processing
 
@@ -222,87 +222,113 @@ class GetBaseLine:
         # Run the dialog event loop
         result = self.dlg.exec_()
         # See if OK was pressed
+
+        flayer = QgsVectorLayer()
+        vlayer = QgsVectorLayer()
+        save_options = QgsVectorFileWriter.SaveVectorOptions()
+        save_options.driverName = "ESRI Shapefile"
+        save_options.fileEncoding = "UTF-8"
+        transform_context = QgsProject.instance().transformContext()
+        error = []
+        black_symbol = QgsFillSymbol.createSimple(
+            {"outline_style": "solid", "outline_color": "black", "color": "#00ff0000", "outline_width": "0.5"})
+        red_symbol = QgsFillSymbol.createSimple(
+            {"outline_style": "solid", "outline_color": "Red", "color": "#00ff0000", "outline_width": "1"})
+
         if result:
             # Do something useful here - delete the line containing pass and
             # substitute with your code.
             output_fieldnames = self.dlg.lineEdit.text()
 
             input_filename = self.dlg.comboBox.currentText()
-            print(input_filename)
+            self.iface.messageBar().pushMessage("msg", "input_filename: " + input_filename, level=Qgis.Info, duration=3)
+            self.iface.messageBar().pushMessage("msg", "ver: " + str(Qgis.QGIS_VERSION_INT), level=Qgis.Info, duration=3)
 
-            flayer = QgsVectorLayer(input_filename, "poly", "ogr")
-            if not flayer.isValid():
-                print("Layer failed to load!: ", input_filename)
-            else:
-                print("Layer loaded!")
-
-            f_name = os.path.splitext(os.path.basename(input_filename))[0] + "_temp"
-            file_num = 0
-            dup_chk_fin = False
-            dup_chk_num = 0
-            new_name = f_name
-
-            self.iface.messageBar().pushMessage("name", "# of layer:" + str(len(layers)), level=Qgis.Info, duration=3)
-
-            while dup_chk_fin == False:
-                file_num += 1
-                dup_chk_num = 0
+            # 입력레이어가 레이어 형식인 경우
+            if ":/" not in input_filename:
 
                 for layer in layers:
-                    if new_name == layer.name():
-                        self.iface.messageBar().pushMessage("name", "The same layer exists. Renaming " +new_name, level=Qgis.Info,
-                                                            duration=3)
-                        new_name = f_name + "(" + str(file_num) + ")"
+                    if input_filename == layer.name():
+                        vlayer = layer.layer()
                         break
-                    else:
-                        dup_chk_num += 1
-                if len(layers) == dup_chk_num:
-                    dup_chk_fin = True
-                    f_name = new_name
-            self.iface.messageBar().pushMessage("name", "# of check: " + str(dup_chk_num), level=Qgis.Info, duration=3)
 
-
-            temp_filename = ''.join(os.path.dirname(input_filename)) +"/"+ f_name + ".shp"
-            self.iface.messageBar().pushMessage("name", temp_filename, level=Qgis.Info, duration=3)
-            save_options = QgsVectorFileWriter.SaveVectorOptions()
-            save_options.driverName = "ESRI Shapefile"
-            save_options.fileEncoding = "UTF-8"
-            transform_context = QgsProject.instance().transformContext()
-
-            error = QgsVectorFileWriter.writeAsVectorFormatV3(flayer, temp_filename, transform_context, save_options)
-
-            if error[0] == QgsVectorFileWriter.NoError:
-                print("temp layer created.")
+            # S 입력레이어가 파일 형식인 경우
             else:
-                print(error)
+                self.iface.messageBar().pushMessage("msg", input_filename + " is file type", level=Qgis.Info, duration=3)
 
+                flayer = QgsVectorLayer(input_filename, "poly", "ogr")
+                if not flayer.isValid():
+                    self.iface.messageBar().pushMessage("msg", "Layer failed to load!: " + input_filename,
+                                                        level=Qgis.Info,
+                                                        duration=3)
+                else:
+                    self.iface.messageBar().pushMessage("msg", "Layer loaded", level=Qgis.Info, duration=3)
 
-            path_to_poly_layer = temp_filename
-            vlayer = QgsVectorLayer(path_to_poly_layer, f_name, "ogr")
-            if not vlayer.isValid():
-                print("Duplicated Layer failed to load!")
-            else:
-                QgsProject.instance().addMapLayer(vlayer)
-                print("Duplicated Layer loaded!")
+                f_name = os.path.splitext(os.path.basename(input_filename))[0] + "_temp"
+                file_num = 0
+                dup_chk_fin = False
+                dup_chk_num = 0
+                new_name = f_name
 
-            symbol = QgsFillSymbol.createSimple(
-                {"outline_style": "solid", "outline_color": "black", "color": "#00ff0000", "outline_width": "0.5"})
+                self.iface.messageBar().pushMessage("msg", "# of layer: " + str(len(layers)), level=Qgis.Info,
+                                                    duration=3)
 
-            vlayer.renderer().setSymbol(symbol)
-            vlayer.triggerRepaint()
-            self.iface.layerTreeView().refreshLayerSymbology(vlayer.id())
+                while dup_chk_fin == False:
+                    file_num += 1
+                    dup_chk_num = 0
+
+                    for layer in layers:
+                        if new_name == layer.name():
+                            self.iface.messageBar().pushMessage("msg", "The same layer exists. Renaming " + new_name,
+                                                                level=Qgis.Info,
+                                                                duration=3)
+                            new_name = f_name + "(" + str(file_num) + ")"
+                            break
+                        else:
+                            dup_chk_num += 1
+                    if len(layers) == dup_chk_num:
+                        dup_chk_fin = True
+                        f_name = new_name
+                self.iface.messageBar().pushMessage("msg", "# of check: " + str(dup_chk_num), level=Qgis.Info,
+                                                    duration=3)
+
+                temp_filename = ''.join(os.path.dirname(input_filename)) + "/" + f_name + ".shp"
+                self.iface.messageBar().pushMessage("msg", temp_filename, level=Qgis.Info, duration=3)
+
+                if Qgis.QGIS_VERSION_INT > 32999:
+                    error = QgsVectorFileWriter.writeAsVectorFormatV3(flayer, temp_filename, transform_context,
+                                                                      save_options)
+                else:
+                    error = QgsVectorFileWriter.writeAsVectorFormatV2(flayer, temp_filename, transform_context,
+                                                                      save_options)
+
+                if error[0] == QgsVectorFileWriter.NoError:
+                    print("temp layer created.")
+                else:
+                    print(error)
+
+                path_to_poly_layer = temp_filename
+                vlayer = QgsVectorLayer(path_to_poly_layer, f_name, "ogr")
+                if not vlayer.isValid():
+                    print("Copy Layer failed to load!")
+                else:
+                    QgsProject.instance().addMapLayer(vlayer)
+                    print("Copy Layer loaded!")
+            # E 입력레이어가 파일 형식인 경우
 
             bfield_cnt = 0
-            pnufield_cnt = 0
-            for f in vlayer.fields():
-                if f.name() == "BUNGI" or f.name() == "bungi":
-                    bfield_cnt += 1
-                elif f.name() == "PNU" or f.name() == "pnu":
-                    pnufield_cnt += 1
+            pnu_field_cnt = 0
 
-            if pnufield_cnt < 1:
-                print("PNU field is not existed")
-                self.iface.messageBar().pushMessage("No PNU", "This file(" + input_filename + ") doesn't have PNU.", level=Qgis.Info, duration=3)
+            if hasattr(vlayer, 'fields'):
+                for f in vlayer.fields():
+                    if f.name() == "BUNGI" or f.name() == "bungi":
+                        bfield_cnt += 1
+                    elif f.name() == "PNU" or f.name() == "pnu":
+                        pnu_field_cnt += 1
+
+            if pnu_field_cnt < 1:
+                self.iface.messageBar().pushMessage("msg", input_filename + " is not Vector Type or doesn't have PNU.",
+                                                    level=Qgis.Info, duration=3)
             else:
                 print("PNU validation checked OK")
 
@@ -337,28 +363,37 @@ class GetBaseLine:
                         vlayer.updateFeature(field)
 
                         print(field["bungi"], pnu_count)
-                    #vlayer.changeAttributeValue(field)
 
                 vlayer.commitChanges()
                 vlayer.endEditCommand()
 
                 vlayer.updateFields()
-                print(pnu_valid, "of", pnu_count, "PNU are valid and processed ")
+
+                vlayer.renderer().setSymbol(black_symbol)
+                vlayer.triggerRepaint()
+                self.iface.layerTreeView().refreshLayerSymbology(vlayer.id())
+
+                self.iface.messageBar().pushMessage("msg", str(pnu_valid) + " of " + str(pnu_count)
+                                                    + " PNUs are valid and processed.", level=Qgis.Info, duration=3)
+
                 output_filename = self.dlg.lineEdit.text()
-                dissolve_result = processing.runAndLoadResults("native:dissolve", {'INPUT': vlayer,
-                                                                      'FIELD': "bungi",
-                                                                      'OUTPUT': 'TEMPORARY_OUTPUT'})
+                dissolve_result = processing.runAndLoadResults("native:dissolve", {'INPUT': vlayer, 'FIELD': "bungi",
+                                                                                   'OUTPUT': 'TEMPORARY_OUTPUT'})
                 olayer = self.iface.activeLayer()
-                symbol = QgsFillSymbol.createSimple(
-                        {"outline_style": "solid", "outline_color": "Red", "color": "#00ff0000", "outline_width": "1"})
-                olayer.renderer().setSymbol(symbol)
+                olayer.renderer().setSymbol(red_symbol)
                 olayer.triggerRepaint()
                 self.iface.layerTreeView().refreshLayerSymbology(olayer.id())
 
-                error = QgsVectorFileWriter.writeAsVectorFormatV3(olayer,
-                                                                output_filename,
-                                                                transform_context,
-                                                                save_options)
+                if Qgis.QGIS_VERSION_INT > 31999:
+                    error = QgsVectorFileWriter.writeAsVectorFormatV3(olayer,
+                                                                      output_filename,
+                                                                      transform_context,
+                                                                      save_options)
+                else:
+                    error = QgsVectorFileWriter.writeAsVectorFormatV2(olayer,
+                                                                      output_filename,
+                                                                      transform_context,
+                                                                      save_options)
 
                 if error[0] == QgsVectorFileWriter.NoError:
                     print("saved", output_filename)
