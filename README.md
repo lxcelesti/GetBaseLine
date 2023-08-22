@@ -1,4 +1,4 @@
-# GetBaseLine <img src="https://github.com/lxsurvey/GetBaseLine/icon.png?raw=true" alt="PluginExporter" width="90"/>
+# GetBaseLine <img src="https://github.com/lxsurvey/GetBaseLine/icon.png?raw=true" alt="GetBaseLine" width="90"/>
 A QGIS plugin for dessolving the same main parcel number
 
 ## Description
