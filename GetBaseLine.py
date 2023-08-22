@@ -230,6 +230,7 @@ class GetBaseLine:
         save_options.fileEncoding = "UTF-8"
         transform_context = QgsProject.instance().transformContext()
         error = []
+        is_vector_layer = False
         black_symbol = QgsFillSymbol.createSimple(
             {"outline_style": "solid", "outline_color": "black", "color": "#00ff0000", "outline_width": "0.5"})
         red_symbol = QgsFillSymbol.createSimple(
@@ -241,28 +242,37 @@ class GetBaseLine:
             output_fieldnames = self.dlg.lineEdit.text()
 
             input_filename = self.dlg.comboBox.currentText()
-            self.iface.messageBar().pushMessage("msg", "input_filename: " + input_filename, level=Qgis.Info, duration=3)
-            self.iface.messageBar().pushMessage("msg", "ver: " + str(Qgis.QGIS_VERSION_INT), level=Qgis.Info, duration=3)
+            self.iface.messageBar().pushMessage("msg", "input_filename(layer): " + input_filename, level=Qgis.Info)
+            self.iface.messageBar().pushMessage("msg", "QGIS version check: " + str(Qgis.QGIS_VERSION_INT), level=Qgis.Info)
+            if Qgis.QGIS_VERSION_INT < 29999:
+                self.iface.messageBar().pushMessage("msg", "This plug-in is compatible on QGIS 3.0 above. It won't work for this computer. Please upgrade your QGIS to the latest one", level=Qgis.Info)
 
             # 입력레이어가 레이어 형식인 경우
             if ":/" not in input_filename:
-
                 for layer in layers:
                     if input_filename == layer.name():
-                        vlayer = layer.layer()
+                        if hasattr(layer, 'layer'):
+                            vlayer = layer.layer()
+                            self.iface.messageBar().pushMessage("msg", "selected layer is " + str(type(vlayer).__name__), level=Qgis.Info)
+                            if str(type(vlayer).__name__) == "QgsVectorLayer":
+                                is_vector_layer = True
+                            else:
+                                is_vector_layer = False
+                        else:
+                            is_vector_layer = False
+                            self.iface.messageBar().pushMessage("msg", "No layer: " + str(type(layer).__name__), level=Qgis.Info)
                         break
 
             # S 입력레이어가 파일 형식인 경우
             else:
-                self.iface.messageBar().pushMessage("msg", input_filename + " is file type", level=Qgis.Info, duration=3)
+                self.iface.messageBar().pushMessage("msg", input_filename + " is file type", level=Qgis.Info)
 
                 flayer = QgsVectorLayer(input_filename, "poly", "ogr")
                 if not flayer.isValid():
-                    self.iface.messageBar().pushMessage("msg", "Layer failed to load!: " + input_filename,
-                                                        level=Qgis.Info,
-                                                        duration=3)
+                    self.iface.messageBar().pushMessage("msg", "Layer failed to load!: " + input_filename, level=Qgis.Info)
                 else:
-                    self.iface.messageBar().pushMessage("msg", "Layer loaded", level=Qgis.Info, duration=3)
+                    is_vector_layer = True
+                    self.iface.messageBar().pushMessage("msg", "Layer loaded", level=Qgis.Info)
 
                 f_name = os.path.splitext(os.path.basename(input_filename))[0] + "_temp"
                 file_num = 0
@@ -270,8 +280,7 @@ class GetBaseLine:
                 dup_chk_num = 0
                 new_name = f_name
 
-                self.iface.messageBar().pushMessage("msg", "# of layer: " + str(len(layers)), level=Qgis.Info,
-                                                    duration=3)
+                self.iface.messageBar().pushMessage("msg", "# of layer: " + str(len(layers)), level=Qgis.Info)
 
                 while dup_chk_fin == False:
                     file_num += 1
@@ -280,8 +289,7 @@ class GetBaseLine:
                     for layer in layers:
                         if new_name == layer.name():
                             self.iface.messageBar().pushMessage("msg", "The same layer exists. Renaming " + new_name,
-                                                                level=Qgis.Info,
-                                                                duration=3)
+                                                                level=Qgis.Info)
                             new_name = f_name + "(" + str(file_num) + ")"
                             break
                         else:
@@ -289,11 +297,10 @@ class GetBaseLine:
                     if len(layers) == dup_chk_num:
                         dup_chk_fin = True
                         f_name = new_name
-                self.iface.messageBar().pushMessage("msg", "# of check: " + str(dup_chk_num), level=Qgis.Info,
-                                                    duration=3)
+                self.iface.messageBar().pushMessage("msg", "# of check: " + str(dup_chk_num), level=Qgis.Info)
 
                 temp_filename = ''.join(os.path.dirname(input_filename)) + "/" + f_name + ".shp"
-                self.iface.messageBar().pushMessage("msg", temp_filename, level=Qgis.Info, duration=3)
+                self.iface.messageBar().pushMessage("msg", temp_filename, level=Qgis.Info)
 
                 if Qgis.QGIS_VERSION_INT > 32999:
                     error = QgsVectorFileWriter.writeAsVectorFormatV3(flayer, temp_filename, transform_context,
@@ -326,9 +333,10 @@ class GetBaseLine:
                     elif f.name() == "PNU" or f.name() == "pnu":
                         pnu_field_cnt += 1
 
-            if pnu_field_cnt < 1:
-                self.iface.messageBar().pushMessage("msg", input_filename + " is not Vector Type or doesn't have PNU.",
-                                                    level=Qgis.Info, duration=3)
+            if not is_vector_layer:
+                self.iface.messageBar().pushMessage("msg", input_filename + " is not Vector layer.", level=Qgis.Info)
+            elif pnu_field_cnt < 1:
+                self.iface.messageBar().pushMessage("msg", input_filename + " doesn't have PNU.", level=Qgis.Info)
             else:
                 print("PNU validation checked OK")
 
@@ -369,12 +377,16 @@ class GetBaseLine:
 
                 vlayer.updateFields()
 
+
+
                 vlayer.renderer().setSymbol(black_symbol)
                 vlayer.triggerRepaint()
+
+
                 self.iface.layerTreeView().refreshLayerSymbology(vlayer.id())
 
                 self.iface.messageBar().pushMessage("msg", str(pnu_valid) + " of " + str(pnu_count)
-                                                    + " PNUs are valid and processed.", level=Qgis.Info, duration=3)
+                                                    + " PNUs are valid and processed.", level=Qgis.Info)
 
                 output_filename = self.dlg.lineEdit.text()
                 dissolve_result = processing.runAndLoadResults("native:dissolve", {'INPUT': vlayer, 'FIELD': "bungi",
