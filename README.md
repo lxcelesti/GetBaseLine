@@ -13,7 +13,7 @@ GetBaseLine is a QGIS plugin that combines parcels that have the same main addre
 
 * QGIS 3.00 or above
 
-
+ 
 
 ## Help
 
