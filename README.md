@@ -17,4 +17,5 @@ GetBaseLine is a QGIS plugin that combines parcels that have the same main addre
 
 ## Help
 
-If you have an issue, a feature request or feedback, please let me know by opening an issue here : https://github.com/lxsurvey/GetBaseLine/issues
+If you have an issue, a feature request or feedback, please let me know by opening an issue here : 
+https://github.com/lxsurvey/GetBaseLine/issues
