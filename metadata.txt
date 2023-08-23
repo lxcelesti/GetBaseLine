@@ -6,7 +6,7 @@
 name=GetBaseLine
 qgisMinimumVersion=3.0
 description=GetBaseLine
-version=0.8
+version=0.9
 author=LX
 email=celesti@lx.or.kr
 
