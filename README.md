@@ -1,5 +1,5 @@
 # GetBaseLine <img src="https://github.com/lxsurvey/GetBaseLine/blob/main/icon.png?raw=true" alt="GetBaseLine" width="90"/>
-A QGIS plugin for dessolving the same main parcel number
+A QGIS plugin for dissolving the same main parcel number
 
 
 
