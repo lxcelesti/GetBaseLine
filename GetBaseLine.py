@@ -27,7 +27,7 @@ import os
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QFileDialog
-from qgis.core import QgsProject, QgsVectorLayer, Qgis, QgsVectorFileWriter, QgsField, QgsExpression, QgsExpressionContextUtils, QgsExpressionContext, QgsFillSymbol, QgsMapLayer
+from qgis.core import QgsProject, QgsVectorLayer, Qgis, QgsVectorFileWriter, QgsField, QgsExpression, QgsExpressionContextUtils, QgsExpressionContext, QgsFillSymbol, QgsMapLayer, QgsProcessingException
 from qgis.PyQt.QtCore import QVariant
 import processing
 
@@ -231,6 +231,7 @@ class GetBaseLine:
         transform_context = QgsProject.instance().transformContext()
         error = []
         is_vector_layer = False
+        is_filewriter = False
         black_symbol = QgsFillSymbol.createSimple(
             {"outline_style": "solid", "outline_color": "black", "color": "#00ff0000", "outline_width": "0.5"})
         red_symbol = QgsFillSymbol.createSimple(
@@ -300,18 +301,25 @@ class GetBaseLine:
                 self.iface.messageBar().pushMessage("msg", "# of check: " + str(dup_chk_num), level=Qgis.Info)
 
                 temp_filename = ''.join(os.path.dirname(input_filename)) + "/" + f_name + ".shp"
-                self.iface.messageBar().pushMessage("msg", temp_filename, level=Qgis.Info)
 
-                if Qgis.QGIS_VERSION_INT > 32999:
-                    error = QgsVectorFileWriter.writeAsVectorFormatV3(flayer, temp_filename, transform_context,
-                                                                      save_options)
+                if hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV3'):
+                    self.iface.messageBar().pushMessage("msg", "writeAsVectorFormatV3", level=Qgis.Info)
+                    error = QgsVectorFileWriter.writeAsVectorFormatV3(flayer, temp_filename, transform_context, save_options)
+                elif hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV2'):
+                    self.iface.messageBar().pushMessage("msg", "writeAsVectorFormatV2", level=Qgis.Info)
+                    error = QgsVectorFileWriter.writeAsVectorFormatV2(flayer, temp_filename, transform_context, save_options)
+                elif hasattr(QgsVectorFileWriter, 'writeAsVectorFormat'):
+                    self.iface.messageBar().pushMessage("msg", "writeAsVectorFormat", level=Qgis.Info)
+                    error = QgsVectorFileWriter.writeAsVectorFormat(flayer, temp_filename, 'utf-8', flayer.crs(), 'ESRI Shapefile')
                 else:
-                    error = QgsVectorFileWriter.writeAsVectorFormatV2(flayer, temp_filename, transform_context,
-                                                                      save_options)
+                    self.iface.messageBar().pushMessage("msg", "no writeAsVectorFormatV, Can't save temp file. Check the Qgis version", level=Qgis.Info)
 
                 if error[0] == QgsVectorFileWriter.NoError:
-                    print("temp layer created.")
+                    is_filewriter = True
+                    self.iface.messageBar().pushMessage("msg", "Created temp layer.", level=Qgis.Info)
                 else:
+                    self.iface.messageBar().pushMessage("ERROR", "Fail to create temp layer. " + str(error[1]), level=Qgis.Critical)
+                    is_filewriter = False
                     print(error)
 
                 path_to_poly_layer = temp_filename
@@ -335,6 +343,14 @@ class GetBaseLine:
 
             if not is_vector_layer:
                 self.iface.messageBar().pushMessage("msg", input_filename + " is not Vector layer.", level=Qgis.Info)
+            elif not is_filewriter:
+                if Qgis.QGIS_VERSION_INT < 29999:
+                    self.iface.messageBar().pushMessage("msg", "Check the QGis version. Please change the version to 3.0 or above.", level=Qgis.Info)
+                else:
+                    self.iface.messageBar().pushMessage("msg",
+                                                        "ERROR: Fail to write a file.",
+                                                        level=Qgis.Info)
+
             elif pnu_field_cnt < 1:
                 self.iface.messageBar().pushMessage("msg", input_filename + " doesn't have PNU.", level=Qgis.Info)
             else:
@@ -377,11 +393,8 @@ class GetBaseLine:
 
                 vlayer.updateFields()
 
-
-
                 vlayer.renderer().setSymbol(black_symbol)
                 vlayer.triggerRepaint()
-
 
                 self.iface.layerTreeView().refreshLayerSymbology(vlayer.id())
 
@@ -389,30 +402,44 @@ class GetBaseLine:
                                                     + " PNUs are valid and processed.", level=Qgis.Info)
 
                 output_filename = self.dlg.lineEdit.text()
-                dissolve_result = processing.runAndLoadResults("native:dissolve", {'INPUT': vlayer, 'FIELD': "bungi",
+
+                try:
+                    dissolve_result = processing.runAndLoadResults("native:dissolve", {'INPUT': vlayer, 'FIELD': "bungi",
                                                                                    'OUTPUT': 'TEMPORARY_OUTPUT'})
+                except:
+                    self.iface.messageBar().pushMessage("msg", "Errors occurred while processing", level=Qgis.Info)
+
                 olayer = self.iface.activeLayer()
                 olayer.renderer().setSymbol(red_symbol)
                 olayer.triggerRepaint()
                 self.iface.layerTreeView().refreshLayerSymbology(olayer.id())
 
-                if Qgis.QGIS_VERSION_INT > 31999:
+                if hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV3'):
                     error = QgsVectorFileWriter.writeAsVectorFormatV3(olayer,
                                                                       output_filename,
                                                                       transform_context,
                                                                       save_options)
-                else:
+                elif hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV2'):
                     error = QgsVectorFileWriter.writeAsVectorFormatV2(olayer,
                                                                       output_filename,
                                                                       transform_context,
                                                                       save_options)
 
+                elif hasattr(QgsVectorFileWriter, 'writeAsVectorFormat'):
+                    error = QgsVectorFileWriter.writeAsVectorFormat(olayer,
+                                                                    output_filename,
+                                                                    'utf-8',
+                                                                    olayer.crs(),
+                                                                    'ESRI Shapefile')
+
+                else:
+                    self.iface.messageBar().pushMessage("msg", "no writeAsVectorFormat, Can't save output file. Check the Qgis version", level=Qgis.Info)
+
                 if error[0] == QgsVectorFileWriter.NoError:
-                    print("saved", output_filename)
                     self.iface.messageBar().pushMessage("Success", "Output file written at " + output_filename,
                                                         level=Qgis.Success, duration=3)
                 else:
-                    print(error)
+                    self.iface.messageBar().pushMessage("Error", str(error[1]), level=Qgis.Critical, duration=3)
 
 
 

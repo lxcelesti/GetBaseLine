@@ -6,11 +6,11 @@
 name=GetBaseLine
 qgisMinimumVersion=3.0
 description=GetBaseLine
-version=0.9
+version=0.9.1
 author=LX
 email=celesti@lx.or.kr
 
-about=It conbines parcels that have the same main address number of PNU. It dissolves the same main address number. 
+about=It combines parcels that have the same main address number of PNU. It dissolves the same main address number.
 
 tracker=https://github.com/lxsurvey/GetBaseLine
 repository=https://github.com/lxsurvey/GetBaseLine
@@ -23,7 +23,7 @@ hasProcessingProvider=no
 # changelog=
 
 # Tags are comma separated with spaces allowed
-tags=PNU, dessolve, union, sajeongline, LX, Continuous Cadastral Map
+tags=PNU, dissolve, union, sajeongline, LX, Continuous Cadastral Map
 
 homepage=https://github.com/lxsurvey/GetBaseLine
 category=Plugins
