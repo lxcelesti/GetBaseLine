@@ -207,6 +207,7 @@ class GetBaseLine:
         self.dlg.comboBoxOwnerField.clear()
         self.dlg.comboBoxOwnerField.setDisabled(True)
         self.dlg.radioButtonOne.setChecked(True)
+        self.dlg.labelResult.setText("")
 
     def select_main_pn(self):
         self.dlg.comboBoxOwnerField.clear()
@@ -226,6 +227,8 @@ class GetBaseLine:
                         if input_name == layer.name():
                             if hasattr(layer, 'layer'):
                                 combo_layer = layer.layer()
+                            else:
+                                self.dlg.labelResult.setText("벡터레이어가 아닙니다. 벡터레이어 또는 shape 파일을 선택해주세요.")
                             break
                 # 파일인 경우
                 else:
@@ -240,7 +243,8 @@ class GetBaseLine:
                     self.dlg.comboBoxOwnerField.addItems([f.name() for f in combo_layer.fields()])
                 self.dlg.comboBoxOwnerField.setEnabled(True)
             else:
-                self.dlg.comboBoxOwnerField.addItems(["레이어 또는 shape 파일을 선택하세요"])
+                self.dlg.labelResult.setText("레이어 또는 shape 파일을 선택하세요.")
+
         else:
             pass
 
