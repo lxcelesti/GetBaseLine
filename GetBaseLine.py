@@ -246,10 +246,13 @@ class GetBaseLine:
             self.iface.messageBar().pushMessage("msg", "input_filename(layer): " + input_filename, level=Qgis.Info)
             self.iface.messageBar().pushMessage("msg", "QGIS version check: " + str(Qgis.QGIS_VERSION_INT), level=Qgis.Info)
             if Qgis.QGIS_VERSION_INT < 29999:
-                self.iface.messageBar().pushMessage("msg", "This plug-in is compatible on QGIS 3.0 above. It won't work for this computer. Please upgrade your QGIS to the latest one", level=Qgis.Info)
+                self.iface.messageBar().pushMessage("msg",
+                                                    "This plug-in is compatible on QGIS 3.0 above. It won't work for this computer. Please upgrade your QGIS to the latest one",
+                                                    level=Qgis.Info)
 
             # 입력레이어가 레이어 형식인 경우
             if ":/" not in input_filename:
+                is_filewriter = True
                 for layer in layers:
                     if input_filename == layer.name():
                         if hasattr(layer, 'layer'):
@@ -320,7 +323,7 @@ class GetBaseLine:
                 else:
                     self.iface.messageBar().pushMessage("ERROR", "Fail to create temp layer. " + str(error[1]), level=Qgis.Critical)
                     is_filewriter = False
-                    print(error)
+                    self.iface.messageBar().pushMessage("Error", str(error[1]), level=Qgis.Critical, duration=3)
 
                 path_to_poly_layer = temp_filename
                 vlayer = QgsVectorLayer(path_to_poly_layer, f_name, "ogr")
@@ -347,9 +350,7 @@ class GetBaseLine:
                 if Qgis.QGIS_VERSION_INT < 29999:
                     self.iface.messageBar().pushMessage("msg", "Check the QGis version. Please change the version to 3.0 or above.", level=Qgis.Info)
                 else:
-                    self.iface.messageBar().pushMessage("msg",
-                                                        "ERROR: Fail to write a file.",
-                                                        level=Qgis.Info)
+                    self.iface.messageBar().pushMessage("msg", "ERROR: Fail to write a file.", level=Qgis.Info)
 
             elif pnu_field_cnt < 1:
                 self.iface.messageBar().pushMessage("msg", input_filename + " doesn't have PNU.", level=Qgis.Info)
