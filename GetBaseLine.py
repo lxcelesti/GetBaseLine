@@ -201,8 +201,50 @@ class GetBaseLine:
                 pass
 
         self.dlg.comboBox.addItems([input_filename])
-
         self.dlg.comboBox.setCurrentIndex(self.dlg.comboBox.count() - 1)
+
+    def change_combo(self):
+        self.dlg.comboBoxOwnerField.clear()
+        self.dlg.comboBoxOwnerField.setDisabled(True)
+        self.dlg.radioButtonOne.setChecked(True)
+
+    def select_main_pn(self):
+        self.dlg.comboBoxOwnerField.clear()
+        self.dlg.comboBoxOwnerField.setDisabled(True)
+
+    def select_owner(self):
+        combo_layer = QgsVectorLayer()
+        if self.dlg.radioButtonBoth.isChecked:
+            if self.dlg.comboBox.count() > 0:
+                self.dlg.comboBoxOwnerField.clear()
+                input_name = self.dlg.comboBox.currentText()
+
+                # 레이어인 경우
+                if ":/" not in input_name:
+                    layers = QgsProject.instance().layerTreeRoot().children()
+                    for layer in layers:
+                        if input_name == layer.name():
+                            if hasattr(layer, 'layer'):
+                                combo_layer = layer.layer()
+                            break
+                # 파일인 경우
+                else:
+                    combo_layer = QgsVectorLayer(input_name, "poly", "ogr")
+                    if not combo_layer.isValid():
+                        self.iface.messageBar().pushMessage("msg", "combo Layer failed to load!: " + input_name,
+                                                            level=Qgis.Info)
+                    else:
+                        self.iface.messageBar().pushMessage("msg", "Layer loaded", level=Qgis.Info)
+
+                if hasattr(combo_layer, 'fields'):
+                    self.dlg.comboBoxOwnerField.addItems([f.name() for f in combo_layer.fields()])
+                self.dlg.comboBoxOwnerField.setEnabled(True)
+            else:
+                self.dlg.comboBoxOwnerField.addItems(["레이어 또는 shape 파일을 선택하세요"])
+        else:
+            pass
+
+
 
     def run(self):
         # Create the dialog with elements (after translation) and keep reference
@@ -212,10 +254,17 @@ class GetBaseLine:
             self.dlg = GetBaseLineDialog()
             self.dlg.pushButton.clicked.connect(self.select_output_file)
             self.dlg.inputButton.clicked.connect(self.select_input_file)
+            self.dlg.radioButtonOne.clicked.connect(self.select_main_pn)
+            self.dlg.radioButtonBoth.clicked.connect(self.select_owner)
+            self.dlg.comboBox.currentTextChanged.connect(self.change_combo)
 
         self.dlg.comboBox.clear()
         layers = QgsProject.instance().layerTreeRoot().children()
         self.dlg.comboBox.addItems([layer.name() for layer in layers])
+
+        self.dlg.comboBoxOwnerField.clear()
+        self.dlg.comboBoxOwnerField.setDisabled(True)
+        self.dlg.labelResult.setText("")
 
         # show the dialog
         self.dlg.show()
@@ -236,6 +285,7 @@ class GetBaseLine:
             {"outline_style": "solid", "outline_color": "black", "color": "#00ff0000", "outline_width": "0.5"})
         red_symbol = QgsFillSymbol.createSimple(
             {"outline_style": "solid", "outline_color": "Red", "color": "#00ff0000", "outline_width": "1"})
+        owner_field_name = ""
 
         if result:
             # Do something useful here - delete the line containing pass and
@@ -243,6 +293,9 @@ class GetBaseLine:
             output_fieldnames = self.dlg.lineEdit.text()
 
             input_filename = self.dlg.comboBox.currentText()
+
+
+
             self.iface.messageBar().pushMessage("msg", "input_filename(layer): " + input_filename, level=Qgis.Info)
             self.iface.messageBar().pushMessage("msg", "QGIS version check: " + str(Qgis.QGIS_VERSION_INT), level=Qgis.Info)
             if Qgis.QGIS_VERSION_INT < 29999:
@@ -339,34 +392,44 @@ class GetBaseLine:
 
             if hasattr(vlayer, 'fields'):
                 for f in vlayer.fields():
-                    if f.name() == "BUNGI" or f.name() == "bungi":
+                    if f.name() == "DSSLV" or f.name() == "dsslv":
                         bfield_cnt += 1
                     elif f.name() == "PNU" or f.name() == "pnu":
                         pnu_field_cnt += 1
 
+            # 벡터레이어 형식이 아닌경우
             if not is_vector_layer:
                 self.iface.messageBar().pushMessage("msg", input_filename + " is not Vector layer.", level=Qgis.Info)
+                self.dlg.labelResult.setText(input_filename + " is not Vector layer.")
+            # 임시레이어 파일 만들기 실패한경우
             elif not is_filewriter:
+                # 버전이 낮은 경우
                 if Qgis.QGIS_VERSION_INT < 29999:
                     self.iface.messageBar().pushMessage("msg", "Check the QGis version. Please change the version to 3.0 or above.", level=Qgis.Info)
+                # 버전 이상없는데 임시레이어 파일 만들기 실패한 경우
                 else:
                     self.iface.messageBar().pushMessage("msg", "ERROR: Fail to write a file.", level=Qgis.Info)
-
+            # PNU 필드가 없는 경우
             elif pnu_field_cnt < 1:
                 self.iface.messageBar().pushMessage("msg", input_filename + " doesn't have PNU.", level=Qgis.Info)
             else:
                 print("PNU validation checked OK")
 
+                # 디졸프필드 존재여부 체크
                 if bfield_cnt > 0:
-                    print("bungi validation checked OK")
+                    print("DSSLV field validation checked OK")
+                #  디졸프필드 생성
                 else:
                     pr = vlayer.dataProvider()
-                    pr.addAttributes([QgsField("bungi", QVariant.String)])
+                    pr.addAttributes([QgsField("DSSLV", QVariant.String)])
                     vlayer.updateFields()
-                    print("bungi field is created")
+                    print("DSSVLD field is created")
 
-                expression1 = QgsExpression('left("PNU", 15)')
-                expression2 = QgsExpression('length("PNU" )')
+                expression1 = QgsExpression('length("PNU")')
+                expression2 = QgsExpression('left("PNU", 15)')
+
+
+
                 context = QgsExpressionContext()
                 context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(vlayer))
 
@@ -374,20 +437,31 @@ class GetBaseLine:
                 pnu_valid = 0
                 pnu_len = 0
 
+                # 디졸브필드에 값 입력하기
                 vlayer.beginEditCommand("Feature triangulation")
                 vlayer.startEditing()
 
                 for field in vlayer.getFeatures():
                     pnu_count += 1
-
                     context.setFeature(field)
-                    field["bungi"] = expression1.evaluate(context)
-                    pnu_len = expression2.evaluate(context)
+                    pnu_len = expression1.evaluate(context)
+
+                    # PNU값 유효한 경우
                     if pnu_len == 19:
                         pnu_valid += 1
-                        vlayer.updateFeature(field)
+                        main_pn = expression2.evaluate(context)
 
-                        print(field["bungi"], pnu_count)
+                        if self.dlg.radioButtonBoth.isChecked():
+                            owner_field_name = self.dlg.comboBoxOwnerField.currentText()
+                            if owner_field_name != "":
+                                expression3 = QgsExpression(owner_field_name)
+                                owner = expression3.evaluate(context)
+                        else:
+                            owner = ""
+
+                        field["DSSLV"] = main_pn + str(owner)
+
+                        vlayer.updateFeature(field)
 
                 vlayer.commitChanges()
                 vlayer.endEditCommand()
@@ -405,7 +479,7 @@ class GetBaseLine:
                 output_filename = self.dlg.lineEdit.text()
 
                 try:
-                    dissolve_result = processing.runAndLoadResults("native:dissolve", {'INPUT': vlayer, 'FIELD': "bungi",
+                    dissolve_result = processing.runAndLoadResults("native:dissolve", {'INPUT': vlayer, 'FIELD': "DSSLV",
                                                                                    'OUTPUT': 'TEMPORARY_OUTPUT'})
                 except:
                     self.iface.messageBar().pushMessage("msg", "Errors occurred while processing", level=Qgis.Info)
