@@ -293,6 +293,8 @@ class GetBaseLine:
             {"outline_style": "solid", "outline_color": "black", "color": "#00ff0000", "outline_width": "0.5"})
         red_symbol = QgsFillSymbol.createSimple(
             {"outline_style": "solid", "outline_color": "Red", "color": "#00ff0000", "outline_width": "1"})
+        blue_symbol = QgsFillSymbol.createSimple(
+            {"outline_style": "solid", "outline_color": "blue", "color": "#00ff0000", "outline_width": "1"})
 
         if result:
             # Do something useful here - delete the line containing pass and
@@ -497,7 +499,12 @@ class GetBaseLine:
                     self.iface.messageBar().pushMessage("msg", "Errors occurred while processing", level=Qgis.Info)
 
                 olayer = self.iface.activeLayer()
-                olayer.renderer().setSymbol(red_symbol)
+                # 본번+소유자: 파랑
+                if self.dlg.radioButtonBoth.isChecked():
+                    olayer.renderer().setSymbol(blue_symbol)
+                # 본번: 빨강
+                else:
+                    olayer.renderer().setSymbol(red_symbol)
                 olayer.triggerRepaint()
                 self.iface.layerTreeView().refreshLayerSymbology(olayer.id())
 
