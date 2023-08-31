@@ -204,20 +204,13 @@ class GetBaseLine:
         self.dlg.comboBox.setCurrentIndex(self.dlg.comboBox.count() - 1)
 
     def change_combo(self):
-        self.dlg.comboBoxOwnerField.clear()
-        self.dlg.comboBoxOwnerField.setDisabled(True)
         self.dlg.radioButtonOne.setChecked(True)
         self.dlg.labelResult.setText("")
-
-    def select_main_pn(self):
-        self.dlg.comboBoxOwnerField.clear()
-        self.dlg.comboBoxOwnerField.setDisabled(True)
 
     def select_owner(self):
         combo_layer = QgsVectorLayer()
         if self.dlg.radioButtonBoth.isChecked:
             if self.dlg.comboBox.count() > 0:
-                self.dlg.comboBoxOwnerField.clear()
                 input_name = self.dlg.comboBox.currentText()
 
                 # 레이어인 경우
@@ -234,21 +227,35 @@ class GetBaseLine:
                 else:
                     combo_layer = QgsVectorLayer(input_name, "poly", "ogr")
                     if not combo_layer.isValid():
-                        self.iface.messageBar().pushMessage("msg", "combo Layer failed to load!: " + input_name,
-                                                            level=Qgis.Info)
+                        self.iface.messageBar().pushMessage("msg", "combo Layer failed to load!: " + input_name, level=Qgis.Info)
                     else:
                         self.iface.messageBar().pushMessage("msg", "Layer loaded", level=Qgis.Info)
 
+                # 소유자 필드 확인
                 if hasattr(combo_layer, 'fields'):
-                    self.dlg.comboBoxOwnerField.addItems([f.name() for f in combo_layer.fields()])
-                self.dlg.comboBoxOwnerField.setEnabled(True)
+                    owner_yn = False
+
+                    #####################################
+                    # 여기부터 다시할것!!!
+                    #####################################
+                    for f in combo_layer.fields():
+                        if f.name() == "OWNER" or f.name() == "REGNO":
+                            owner_yn = True
+
+                    if not owner_yn:
+                        self.dlg.radioButtonOne.setChecked(True)
+                        self.dlg.labelResult.setText("소유자 정보가 없습니다. 소유자 정보가 있는 shape 파일을 선택하세요.")
+
+
+                else:
+                    self.dlg.radioButtonOne.setChecked(True)
+                    self.dlg.labelResult.setText("벡터레이어가 아닙니다. 레이어를 확인하세요. ")
+
             else:
                 self.dlg.labelResult.setText("레이어 또는 shape 파일을 선택하세요.")
 
         else:
             pass
-
-
 
     def run(self):
         # Create the dialog with elements (after translation) and keep reference
@@ -258,7 +265,6 @@ class GetBaseLine:
             self.dlg = GetBaseLineDialog()
             self.dlg.pushButton.clicked.connect(self.select_output_file)
             self.dlg.inputButton.clicked.connect(self.select_input_file)
-            self.dlg.radioButtonOne.clicked.connect(self.select_main_pn)
             self.dlg.radioButtonBoth.clicked.connect(self.select_owner)
             self.dlg.comboBox.currentTextChanged.connect(self.change_combo)
 
@@ -266,8 +272,6 @@ class GetBaseLine:
         layers = QgsProject.instance().layerTreeRoot().children()
         self.dlg.comboBox.addItems([layer.name() for layer in layers])
 
-        self.dlg.comboBoxOwnerField.clear()
-        self.dlg.comboBoxOwnerField.setDisabled(True)
         self.dlg.labelResult.setText("")
 
         # show the dialog
@@ -289,16 +293,12 @@ class GetBaseLine:
             {"outline_style": "solid", "outline_color": "black", "color": "#00ff0000", "outline_width": "0.5"})
         red_symbol = QgsFillSymbol.createSimple(
             {"outline_style": "solid", "outline_color": "Red", "color": "#00ff0000", "outline_width": "1"})
-        owner_field_name = ""
 
         if result:
             # Do something useful here - delete the line containing pass and
             # substitute with your code.
             output_fieldnames = self.dlg.lineEdit.text()
-
             input_filename = self.dlg.comboBox.currentText()
-
-
 
             self.iface.messageBar().pushMessage("msg", "input_filename(layer): " + input_filename, level=Qgis.Info)
             self.iface.messageBar().pushMessage("msg", "QGIS version check: " + str(Qgis.QGIS_VERSION_INT), level=Qgis.Info)
@@ -417,22 +417,20 @@ class GetBaseLine:
             elif pnu_field_cnt < 1:
                 self.iface.messageBar().pushMessage("msg", input_filename + " doesn't have PNU.", level=Qgis.Info)
             else:
-                print("PNU validation checked OK")
-
-                # 디졸프필드 존재여부 체크
+                # 디졸브필드 존재여부 체크
                 if bfield_cnt > 0:
-                    print("DSSLV field validation checked OK")
+                    self.iface.messageBar().pushMessage("msg", "DSSLV field validation checked OK", level=Qgis.Info)
                 #  디졸프필드 생성
                 else:
                     pr = vlayer.dataProvider()
                     pr.addAttributes([QgsField("DSSLV", QVariant.String)])
                     vlayer.updateFields()
-                    print("DSSVLD field is created")
+                    self.iface.messageBar().pushMessage("msg", "DSSLV field is created", level=Qgis.Info)
 
                 expression1 = QgsExpression('length("PNU")')
                 expression2 = QgsExpression('left("PNU", 15)')
-
-
+                expression3 = QgsExpression('OWNER')
+                expression4 = QgsExpression('REGNO')
 
                 context = QgsExpressionContext()
                 context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(vlayer))
@@ -442,44 +440,54 @@ class GetBaseLine:
                 pnu_len = 0
 
                 # 디졸브필드에 값 입력하기
-                vlayer.beginEditCommand("Feature triangulation")
                 vlayer.startEditing()
+                vlayer.beginEditCommand("Feature triangulation")
+
+                if vlayer.isEditable():
+                    self.iface.messageBar().pushMessage("msg", "This layer is editable", level=Qgis.Info)
+                else:
+                    self.iface.messageBar().pushMessage("msg", "This layer is not editable", level=Qgis.Info)
+
+                idxDsslv = vlayer.fields().indexOf('DSSLV')
+                self.iface.messageBar().pushMessage("msg", "DSSLV index : " + str(idxDsslv), level=Qgis.Info)
+                self.iface.messageBar().pushMessage("msg", "PNU index : " + str(vlayer.fields().indexOf('PNU')), level=Qgis.Info)
 
                 for field in vlayer.getFeatures():
                     pnu_count += 1
                     context.setFeature(field)
                     pnu_len = expression1.evaluate(context)
+                    dsslv = str("Invalid PNU")
 
                     # PNU값 유효한 경우
                     if pnu_len == 19:
                         pnu_valid += 1
                         main_pn = expression2.evaluate(context)
+                        dsslv = str(main_pn)
 
                         if self.dlg.radioButtonBoth.isChecked():
-                            owner_field_name = self.dlg.comboBoxOwnerField.currentText()
-                            if owner_field_name != "":
-                                expression3 = QgsExpression(owner_field_name)
-                                owner = expression3.evaluate(context)
-                        else:
-                            owner = ""
+                            owner = expression3.evaluate(context)
+                            regno = expression4.evaluate(context)
 
-                        field["DSSLV"] = main_pn + str(owner)
+                            if owner is not None:
+                                dsslv += str(owner)
+                            if regno is not None:
+                                dsslv += str(regno)
 
-                        vlayer.updateFeature(field)
+                    vlayer.changeAttributeValue(field.id(), idxDsslv, dsslv)
+                    #field["DSSLV"] = dsslv
+
+                    #vlayer.updateFeature(field)
 
                 vlayer.commitChanges()
                 vlayer.endEditCommand()
-
-                vlayer.updateFields()
+                #vlayer.updateFields()
 
                 vlayer.renderer().setSymbol(black_symbol)
                 vlayer.triggerRepaint()
 
                 self.iface.layerTreeView().refreshLayerSymbology(vlayer.id())
-
                 self.iface.messageBar().pushMessage("msg", str(pnu_valid) + " of " + str(pnu_count)
                                                     + " PNUs are valid and processed.", level=Qgis.Info)
-
                 output_filename = self.dlg.lineEdit.text()
 
                 try:
@@ -519,8 +527,6 @@ class GetBaseLine:
                                                         level=Qgis.Success, duration=3)
                 else:
                     self.iface.messageBar().pushMessage("Error", str(error[1]), level=Qgis.Critical, duration=3)
-
-
 
 
 
