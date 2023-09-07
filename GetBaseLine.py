@@ -230,30 +230,21 @@ class GetBaseLine:
                         self.iface.messageBar().pushMessage("msg", "combo Layer failed to load!: " + input_name, level=Qgis.Info)
                     else:
                         self.iface.messageBar().pushMessage("msg", "Layer loaded", level=Qgis.Info)
-
                 # 소유자 필드 확인
                 if hasattr(combo_layer, 'fields'):
                     owner_yn = False
 
-                    #####################################
-                    # 여기부터 다시할것!!!
-                    #####################################
                     for f in combo_layer.fields():
                         if f.name() == "OWNER" or f.name() == "REGNO":
                             owner_yn = True
-
                     if not owner_yn:
                         self.dlg.radioButtonOne.setChecked(True)
                         self.dlg.labelResult.setText("소유자 정보가 없습니다. 소유자 정보가 있는 shape 파일을 선택하세요.")
-
-
                 else:
                     self.dlg.radioButtonOne.setChecked(True)
                     self.dlg.labelResult.setText("벡터레이어가 아닙니다. 레이어를 확인하세요. ")
-
             else:
                 self.dlg.labelResult.setText("레이어 또는 shape 파일을 선택하세요.")
-
         else:
             pass
 
@@ -398,7 +389,7 @@ class GetBaseLine:
 
             if hasattr(vlayer, 'fields'):
                 for f in vlayer.fields():
-                    if f.name() == "DSSLV" or f.name() == "dsslv":
+                    if "DSSLV" in f.name() or "dsslv" in f.name():
                         bfield_cnt += 1
                     elif f.name() == "PNU" or f.name() == "pnu":
                         pnu_field_cnt += 1
@@ -445,18 +436,13 @@ class GetBaseLine:
                 vlayer.startEditing()
                 vlayer.beginEditCommand("Feature triangulation")
 
-                if vlayer.isEditable():
-                    self.iface.messageBar().pushMessage("msg", "This layer is editable", level=Qgis.Info)
-                else:
-                    self.iface.messageBar().pushMessage("msg", "This layer is not editable", level=Qgis.Info)
-
-                idxDsslv = vlayer.fields().indexOf('DSSLV')
+                idxDsslv = vlayer.fields().indexFromName('DSSLV')
                 self.iface.messageBar().pushMessage("msg", "DSSLV index : " + str(idxDsslv), level=Qgis.Info)
                 self.iface.messageBar().pushMessage("msg", "PNU index : " + str(vlayer.fields().indexOf('PNU')), level=Qgis.Info)
 
-                for field in vlayer.getFeatures():
+                for f in vlayer.getFeatures():
                     pnu_count += 1
-                    context.setFeature(field)
+                    context.setFeature(f)
                     pnu_len = expression1.evaluate(context)
                     dsslv = str("Invalid PNU")
 
@@ -474,15 +460,13 @@ class GetBaseLine:
                                 dsslv += str(owner)
                             if regno is not None:
                                 dsslv += str(regno)
+                    else:
+                        dsslv = "invalid"
 
-                    vlayer.changeAttributeValue(field.id(), idxDsslv, dsslv)
-                    #field["DSSLV"] = dsslv
-
-                    #vlayer.updateFeature(field)
+                    vlayer.changeAttributeValue(f.id(), idxDsslv, dsslv)
 
                 vlayer.commitChanges()
                 vlayer.endEditCommand()
-                #vlayer.updateFields()
 
                 vlayer.renderer().setSymbol(black_symbol)
                 vlayer.triggerRepaint()
