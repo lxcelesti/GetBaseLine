@@ -6,7 +6,7 @@
 name=GetBaseLine
 qgisMinimumVersion=3.0
 description=GetBaseLine
-version=1.0
+version=1.0.1
 author=LX
 email=celesti@lx.or.kr
 
@@ -23,7 +23,7 @@ hasProcessingProvider=no
 # changelog=
 
 # Tags are comma separated with spaces allowed
-tags=PNU, dissolve, union, sajeongline, LX, Continuous Cadastral Map
+tags=LX, PNU, dissolve, union, sajeongline, Continuous Cadastral Map
 
 homepage=https://github.com/lxsurvey/GetBaseLine
 category=Plugins

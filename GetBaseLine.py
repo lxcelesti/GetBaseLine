@@ -209,44 +209,45 @@ class GetBaseLine:
 
     def select_owner(self):
         combo_layer = QgsVectorLayer()
-        if self.dlg.radioButtonBoth.isChecked:
-            if self.dlg.comboBox.count() > 0:
-                input_name = self.dlg.comboBox.currentText()
 
-                # 레이어인 경우
-                if ":/" not in input_name:
-                    layers = QgsProject.instance().layerTreeRoot().children()
-                    for layer in layers:
-                        if input_name == layer.name():
-                            if hasattr(layer, 'layer'):
-                                combo_layer = layer.layer()
-                            else:
-                                self.dlg.labelResult.setText("벡터레이어가 아닙니다. 벡터레이어 또는 shape 파일을 선택해주세요.")
-                            break
-                # 파일인 경우
-                else:
-                    combo_layer = QgsVectorLayer(input_name, "poly", "ogr")
-                    if not combo_layer.isValid():
-                        self.iface.messageBar().pushMessage("msg", "combo Layer failed to load!: " + input_name, level=Qgis.Info)
-                    else:
-                        self.iface.messageBar().pushMessage("msg", "Layer loaded", level=Qgis.Info)
-                # 소유자 필드 확인
-                if hasattr(combo_layer, 'fields'):
-                    owner_yn = False
+        if self.dlg.comboBox.count() > 0:
+            input_name = self.dlg.comboBox.currentText()
 
-                    for f in combo_layer.fields():
-                        if f.name() == "OWNER" or f.name() == "REGNO":
-                            owner_yn = True
-                    if not owner_yn:
-                        self.dlg.radioButtonOne.setChecked(True)
-                        self.dlg.labelResult.setText("소유자 정보가 없습니다. 소유자 정보가 있는 shape 파일을 선택하세요.")
-                else:
-                    self.dlg.radioButtonOne.setChecked(True)
-                    self.dlg.labelResult.setText("벡터레이어가 아닙니다. 레이어를 확인하세요. ")
+            # 레이어인 경우
+            if ":/" not in input_name:
+                layers = QgsProject.instance().layerTreeRoot().children()
+                for layer in layers:
+                    if input_name == layer.name():
+                        if hasattr(layer, 'layer'):
+                            combo_layer = layer.layer()
+                        else:
+                            self.dlg.labelResult.setText("벡터레이어가 아닙니다. 벡터레이어 또는 shape 파일을 선택해주세요.")
+                        break
+            # 파일인 경우
             else:
-                self.dlg.labelResult.setText("레이어 또는 shape 파일을 선택하세요.")
+                combo_layer = QgsVectorLayer(input_name, "poly", "ogr")
+                if not combo_layer.isValid():
+                    self.iface.messageBar().pushMessage("msg", "combo Layer failed to load!: " + input_name,
+                                                        level=Qgis.Info)
+                else:
+                    self.iface.messageBar().pushMessage("msg", "Layer loaded", level=Qgis.Info)
+            # 소유자 필드 확인
+            if hasattr(combo_layer, 'fields'):
+                owner_yn = False
+
+                for f in combo_layer.fields():
+                    if f.name() == "OWNER" or f.name() == "REGNO":
+                        owner_yn = True
+                if not owner_yn:
+                    self.dlg.radioButtonOne.setChecked(True)
+                    self.dlg.labelResult.setText("소유자 정보가 없습니다. 소유자 정보가 있는 shape 파일을 선택하세요.")
+            else:
+                self.dlg.radioButtonOne.setChecked(True)
+                self.dlg.labelResult.setText("벡터레이어가 아닙니다. 레이어를 확인하세요. ")
         else:
-            pass
+            self.dlg.labelResult.setText("레이어 또는 shape 파일을 선택하세요.")
+
+
 
     def run(self):
         # Create the dialog with elements (after translation) and keep reference
@@ -257,6 +258,7 @@ class GetBaseLine:
             self.dlg.pushButton.clicked.connect(self.select_output_file)
             self.dlg.inputButton.clicked.connect(self.select_input_file)
             self.dlg.radioButtonBoth.clicked.connect(self.select_owner)
+            self.dlg.radioButtonOwner.clicked.connect(self.select_owner)
             self.dlg.comboBox.currentTextChanged.connect(self.change_combo)
 
         self.dlg.comboBox.clear()
@@ -286,6 +288,8 @@ class GetBaseLine:
             {"outline_style": "solid", "outline_color": "Red", "color": "#00ff0000", "outline_width": "1"})
         blue_symbol = QgsFillSymbol.createSimple(
             {"outline_style": "solid", "outline_color": "blue", "color": "#00ff0000", "outline_width": "1"})
+        green_symbol = QgsFillSymbol.createSimple(
+            {"outline_style": "solid", "outline_color": "green", "color": "#00ff0000", "outline_width": "1"})
 
         if result:
             # Do something useful here - delete the line containing pass and
@@ -450,9 +454,13 @@ class GetBaseLine:
                     if pnu_len == 19:
                         pnu_valid += 1
                         main_pn = expression2.evaluate(context)
-                        dsslv = str(main_pn)
 
-                        if self.dlg.radioButtonBoth.isChecked():
+                        if self.dlg.radioButtonOwner.isChecked():
+                            dsslv = ""
+                        else:
+                            dsslv = str(main_pn)
+
+                        if self.dlg.radioButtonBoth.isChecked() or self.dlg.radioButtonOwner.isChecked():
                             owner = expression3.evaluate(context)
                             regno = expression4.evaluate(context)
 
@@ -483,8 +491,12 @@ class GetBaseLine:
                     self.iface.messageBar().pushMessage("msg", "Errors occurred while processing", level=Qgis.Info)
 
                 olayer = self.iface.activeLayer()
-                # 본번+소유자: 파랑
+
+                # 본번+소유자: 녹색
                 if self.dlg.radioButtonBoth.isChecked():
+                    olayer.renderer().setSymbol(green_symbol)
+                # 본번: 파랑
+                elif self.dlg.radioButtonOwner.isChecked():
                     olayer.renderer().setSymbol(blue_symbol)
                 # 본번: 빨강
                 else:
