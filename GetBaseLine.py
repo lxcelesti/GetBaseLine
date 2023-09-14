@@ -494,12 +494,15 @@ class GetBaseLine:
 
                 # 본번+소유자: 녹색
                 if self.dlg.radioButtonBoth.isChecked():
+                    olayer.setName("사정선(본번&소유자)")
                     olayer.renderer().setSymbol(green_symbol)
                 # 본번: 파랑
                 elif self.dlg.radioButtonOwner.isChecked():
+                    olayer.setName("사정선(소유자)")
                     olayer.renderer().setSymbol(blue_symbol)
                 # 본번: 빨강
                 else:
+                    olayer.setName("사정선(본번)")
                     olayer.renderer().setSymbol(red_symbol)
                 olayer.triggerRepaint()
                 self.iface.layerTreeView().refreshLayerSymbology(olayer.id())
