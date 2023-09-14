@@ -282,6 +282,7 @@ class GetBaseLine:
         error = []
         is_vector_layer = False
         is_filewriter = False
+        is_dissolve_Fail = False
         black_symbol = QgsFillSymbol.createSimple(
             {"outline_style": "solid", "outline_color": "black", "color": "#00ff0000", "outline_width": "0.5"})
         red_symbol = QgsFillSymbol.createSimple(
@@ -488,51 +489,58 @@ class GetBaseLine:
                     dissolve_result = processing.runAndLoadResults("native:dissolve", {'INPUT': vlayer, 'FIELD': "DSSLV",
                                                                                    'OUTPUT': 'TEMPORARY_OUTPUT'})
                 except:
-                    self.iface.messageBar().pushMessage("msg", "Errors occurred while processing", level=Qgis.Info)
+                    self.iface.messageBar().pushMessage("Error", "디졸브(dissolve)를 처리하는데 에러가 발생했습니다. 설정>옵션>공간처리>일반 에서 필터링옵션을 확인해주세요.", level=Qgis.Critical)
+                    is_dissolve_Fail = True
 
-                olayer = self.iface.activeLayer()
+                # 디졸브가 실해하지않았다면(성공하면)
+                if is_dissolve_Fail is False:
+                    olayer = self.iface.activeLayer()
 
-                # 본번+소유자: 녹색
-                if self.dlg.radioButtonBoth.isChecked():
-                    olayer.setName("사정선(본번&소유자)")
-                    olayer.renderer().setSymbol(green_symbol)
-                # 본번: 파랑
-                elif self.dlg.radioButtonOwner.isChecked():
-                    olayer.setName("사정선(소유자)")
-                    olayer.renderer().setSymbol(blue_symbol)
-                # 본번: 빨강
-                else:
-                    olayer.setName("사정선(본번)")
-                    olayer.renderer().setSymbol(red_symbol)
-                olayer.triggerRepaint()
-                self.iface.layerTreeView().refreshLayerSymbology(olayer.id())
+                    # 본번+소유자: 녹색
+                    if self.dlg.radioButtonBoth.isChecked():
+                        olayer.setName("사정선(본번&소유자)")
+                        olayer.renderer().setSymbol(green_symbol)
+                    # 본번: 파랑
+                    elif self.dlg.radioButtonOwner.isChecked():
+                        olayer.setName("사정선(소유자)")
+                        olayer.renderer().setSymbol(blue_symbol)
+                    # 본번: 빨강
+                    else:
+                        olayer.setName("사정선(본번)")
+                        olayer.renderer().setSymbol(red_symbol)
+                    olayer.triggerRepaint()
+                    self.iface.layerTreeView().refreshLayerSymbology(olayer.id())
 
-                if hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV3'):
-                    error = QgsVectorFileWriter.writeAsVectorFormatV3(olayer,
-                                                                      output_filename,
-                                                                      transform_context,
-                                                                      save_options)
-                elif hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV2'):
-                    error = QgsVectorFileWriter.writeAsVectorFormatV2(olayer,
-                                                                      output_filename,
-                                                                      transform_context,
-                                                                      save_options)
+                    if hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV3'):
+                        error = QgsVectorFileWriter.writeAsVectorFormatV3(olayer,
+                                                                          output_filename,
+                                                                          transform_context,
+                                                                          save_options)
+                    elif hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV2'):
+                        error = QgsVectorFileWriter.writeAsVectorFormatV2(olayer,
+                                                                          output_filename,
+                                                                          transform_context,
+                                                                          save_options)
 
-                elif hasattr(QgsVectorFileWriter, 'writeAsVectorFormat'):
-                    error = QgsVectorFileWriter.writeAsVectorFormat(olayer,
-                                                                    output_filename,
-                                                                    'utf-8',
-                                                                    olayer.crs(),
-                                                                    'ESRI Shapefile')
+                    elif hasattr(QgsVectorFileWriter, 'writeAsVectorFormat'):
+                        error = QgsVectorFileWriter.writeAsVectorFormat(olayer,
+                                                                        output_filename,
+                                                                        'utf-8',
+                                                                        olayer.crs(),
+                                                                        'ESRI Shapefile')
 
-                else:
-                    self.iface.messageBar().pushMessage("msg", "no writeAsVectorFormat, Can't save output file. Check the Qgis version", level=Qgis.Info)
+                    else:
+                        self.iface.messageBar().pushMessage("msg",
+                                                            "no writeAsVectorFormat, Can't save output file. Check the Qgis version",
+                                                            level=Qgis.Info)
 
-                if error[0] == QgsVectorFileWriter.NoError:
-                    self.iface.messageBar().pushMessage("Success", "Output file written at " + output_filename,
-                                                        level=Qgis.Success, duration=3)
-                else:
-                    self.iface.messageBar().pushMessage("Error", str(error[1]), level=Qgis.Critical, duration=3)
+                    if error[0] == QgsVectorFileWriter.NoError:
+                        self.iface.messageBar().pushMessage("Success", "Output file written at " + output_filename,
+                                                            level=Qgis.Success, duration=3)
+                    else:
+                        self.iface.messageBar().pushMessage("Error", str(error[1]), level=Qgis.Critical, duration=3)
+
+
 
 
 
